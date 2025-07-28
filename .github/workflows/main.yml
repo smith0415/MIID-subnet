@@ -1,0 +1,36 @@
+name: Watch Upstream Commits
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'  # every 15 minutes
+  workflow_dispatch:
+
+jobs:
+  check-upstream:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout your fork
+      uses: actions/checkout@v3
+
+    - name: Add upstream remote and fetch
+      run: |
+        git remote add upstream https://github.com/oiid/MIID-subnet.git
+        git fetch upstream
+        git log HEAD..upstream/main --oneline > new_commits.txt
+
+    - name: Check for new commits and send Discord alert
+      if: success()
+      env:
+        DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+      run: |
+        if [ -s new_commits.txt ]; then
+          echo "New upstream commits found"
+          commits=$(cat new_commits.txt | head -5)
+          curl -H "Content-Type: application/json" \
+            -X POST \
+            -d "{\"content\": \"🔔 New upstream commits on oiid/MIID-subnet:\n\`\`\`${commits}\`\`\`\"}" \
+            $DISCORD_WEBHOOK
+        else
+          echo "No new commits"
+        fi
